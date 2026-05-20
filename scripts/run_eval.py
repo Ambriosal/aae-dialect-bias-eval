@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import csv
+import sys
 from pathlib import Path
 from typing import Any
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import numpy as np
 from sklearn.metrics import f1_score
@@ -141,11 +146,11 @@ def eval_against_gold(
 
 
 def main() -> None:
-    root = Path(__file__).resolve().parent
-    out = root / "outputs"
+    repo_root = _SCRIPTS_DIR.parent
+    out = repo_root / "outputs"
     out.mkdir(exist_ok=True)
 
-    gold = load_gold_rows(root)
+    gold = load_gold_rows(repo_root / "annotations")
     gold_labels = [r["gold_label"] for r in gold]
 
     summary_lines: list[str] = []
@@ -157,7 +162,7 @@ def main() -> None:
     subset_mat: list[np.ndarray] = []
 
     for model_name, fname in MODEL_FILES.items():
-        path = root / fname
+        path = repo_root / "models" / fname
         preds, pmeta = load_preds_csv(path)
         records = build_eval_records(gold, preds)
         subset_mat.append(viz.subset_accuracy_vector(records))
@@ -275,6 +280,27 @@ def main() -> None:
         encoding="utf-8",
     )
     print(f"\nwrote {sum_path}")
+
+    if cmp_names and per_f1_rows:
+        f1_csv = out / "per_class_f1.csv"
+        f1_header = ["model"] + [f"f1_{lab}" for lab in LABEL_ORDER]
+        with f1_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(f1_header)
+            for name, triple in zip(cmp_names, per_f1_rows):
+                w.writerow([name, *[f"{v:.6f}" for v in triple]])
+        print(f"wrote {f1_csv.name}")
+
+    if subset_mat:
+        sub_csv = out / "subset_accuracy_matrix.csv"
+        sub_header = ["model", *list(viz.SUBSET_ORDER)]
+        stacked = np.vstack(subset_mat)
+        with sub_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(sub_header)
+            for name, row in zip(MODEL_FILES.keys(), stacked):
+                w.writerow([name, *[f"{float(x):.6f}" for x in row]])
+        print(f"wrote {sub_csv.name}")
 
     if grid_panels:
         viz.grid_row_norm_confusions(

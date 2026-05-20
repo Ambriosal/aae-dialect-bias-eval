@@ -19,10 +19,15 @@ from tie_policies import TiePolicy, default_tie_policy
 # filenames in this folder — tweak if you rename exports
 COMMON_CSV = "common_100_majority_vote.csv"
 ANNOTATOR_FILES: list[tuple[str, str]] = [
-    ("annotator_1_unique", "annotator_1_annotations_2026-05-19T04-05-02.317Z (1).csv"),
-    ("annotator_2_unique", "annotator_2_annotations_300.csv"),
+    ("annotator_1_unique", "annotator_1_annotations_300_unique.csv"),
+    ("annotator_2_unique", "annotator_2_annotations_300_unique.csv"),
     ("annotator_3_unique", "annotator_3_annotations_300_unique.csv"),
 ]
+
+
+def _default_gold_dir() -> Path:
+    """annotations/ next to scripts/ after repo re-org."""
+    return Path(__file__).resolve().parent.parent / "annotations"
 
 
 def _majority_or_tie(
@@ -95,7 +100,7 @@ def load_gold_rows(
     data_dir: str | Path | None = None,
     tie_policy: TiePolicy | None = None,
 ) -> list[dict[str, Any]]:
-    root = Path(data_dir) if data_dir else Path(__file__).resolve().parent
+    root = Path(data_dir) if data_dir is not None else _default_gold_dir()
     tie = tie_policy if tie_policy is not None else default_tie_policy()
 
     rows: list[dict[str, Any]] = []
