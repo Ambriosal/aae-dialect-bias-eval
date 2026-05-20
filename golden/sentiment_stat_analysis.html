@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stats + Visualization Plan — AAE Bias Study</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:wght@700;900&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #22222e;
+    --border: #2e2e3e;
+    --text: #e8e6f0;
+    --muted: #8884a0;
+    --accent: #ff6b6b;
+    --blue: #5b9cf6;
+    --green: #52d68a;
+    --yellow: #ffd166;
+    --purple: #c084fc;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'Playfair Display', serif;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.7; }
+
+  .page { max-width: 920px; margin: 0 auto; padding: 52px 28px 100px; }
+
+  .header { margin-bottom: 48px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  h1 { font-family: var(--serif); font-size: 42px; line-height: 1.1; margin-bottom: 14px; }
+  h1 span { color: var(--accent); }
+  .header-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* Stat grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 44px; }
+  @media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .stat-card.best { border-color: var(--green); }
+  .stat-card.worst { border-color: var(--accent); }
+  .stat-card .model-name { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-card .acc { font-family: var(--serif); font-size: 26px; color: var(--text); }
+  .stat-card .f1 { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stat-card .badge { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 2px 7px; border-radius: 20px; margin-top: 6px; }
+  .badge-green { background: rgba(82,214,138,.15); color: var(--green); }
+  .badge-red { background: rgba(255,107,107,.15); color: var(--accent); }
+
+  /* Full stats table */
+  .section { margin-bottom: 52px; }
+  .section-label { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  h2 { font-family: var(--serif); font-size: 24px; margin-bottom: 8px; }
+  h3 { font-family: var(--sans); font-size: 16px; font-weight: 500; margin-bottom: 10px; color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+  td { padding: 9px 10px; border-bottom: 1px solid rgba(46,46,62,.6); font-family: var(--mono); font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .best-val { color: var(--green); font-weight: 500; }
+  .worst-val { color: var(--accent); }
+  .mid-val { color: var(--yellow); }
+
+  /* Bias bar */
+  .bias-row { margin-bottom: 18px; }
+  .bias-label { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+  .bias-track { height: 28px; background: var(--surface2); border-radius: 4px; overflow: hidden; display: flex; position: relative; }
+  .bias-neg { background: linear-gradient(90deg, #ff6b6b, #c0392b); height: 100%; display: flex; align-items: center; padding-left: 8px; font-family: var(--mono); font-size: 11px; color: #fff; }
+  .bias-pos { background: linear-gradient(90deg, #52d68a, #27ae60); height: 100%; display: flex; align-items: center; padding-left: 8px; font-family: var(--mono); font-size: 11px; color: #000; }
+  .bias-rest { flex: 1; background: var(--surface); }
+
+  /* Viz cards */
+  .viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .viz-grid { grid-template-columns: 1fr; } }
+  .viz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .viz-card.priority-1 { border-left: 3px solid var(--green); }
+  .viz-card.priority-2 { border-left: 3px solid var(--yellow); }
+  .viz-card.priority-3 { border-left: 3px solid var(--purple); }
+  .viz-card.wow { border-left: 3px solid var(--accent); background: rgba(255,107,107,.04); }
+  .viz-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+  .viz-card h4 { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .viz-card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .viz-card .tools { font-family: var(--mono); font-size: 10px; color: var(--blue); margin-top: 8px; }
+  .resume-tag { display: inline-block; font-family: var(--mono); font-size: 9px; padding: 2px 8px; border-radius: 20px; background: rgba(192,132,252,.15); color: var(--purple); margin-top: 6px; }
+
+  /* Finding callouts */
+  .finding { background: var(--surface); border-left: 3px solid var(--yellow); border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 12px; }
+  .finding .f-label { font-family: var(--mono); font-size: 10px; color: var(--yellow); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
+  .finding p { font-size: 13.5px; }
+  .finding strong { color: var(--text); }
+
+  .spacer { height: 28px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="eyebrow">AAE Dialect Bias Study · Statistical Report + Visualization Plan</div>
+    <h1>Results & <span>Viz Roadmap</span></h1>
+    <div class="header-meta">Generated May 19, 2026 · 1000-item human gold label · 6 models evaluated · For Ryan Wu + Dr. Seyyed-Kalantari</div>
+  </div>
+
+  <!-- HEADLINE STATS -->
+  <div class="section-label">01 — Headline Accuracy</div>
+  <div class="stat-grid">
+    <div class="stat-card worst">
+      <div class="model-name">LLaMA 3.1 70B</div>
+      <div class="acc">48.2%</div>
+      <div class="f1">Macro F1: 0.466</div>
+      <span class="badge badge-red">Worst</span>
+    </div>
+    <div class="stat-card">
+      <div class="model-name">DeepSeek-R1</div>
+      <div class="acc">54.1%</div>
+      <div class="f1">Macro F1: 0.503</div>
+    </div>
+    <div class="stat-card">
+      <div class="model-name">Phi-3-Medium</div>
+      <div class="acc">61.5%</div>
+      <div class="f1">Macro F1: 0.585</div>
+    </div>
+    <div class="stat-card">
+      <div class="model-name">Mistral 3.1</div>
+      <div class="acc">61.7%</div>
+      <div class="f1">Macro F1: 0.580</div>
+    </div>
+    <div class="stat-card">
+      <div class="model-name">Gemma 3</div>
+      <div class="acc">63.1%</div>
+      <div class="f1">Macro F1: 0.569</div>
+    </div>
+    <div class="stat-card best">
+      <div class="model-name">Phi-4</div>
+      <div class="acc">65.4%</div>
+      <div class="f1">Macro F1: 0.617</div>
+      <span class="badge badge-green">Best</span>
+    </div>
+  </div>
+
+  <!-- FULL STATS TABLE -->
+  <div class="section-label">02 — Full Per-Class Breakdown</div>
+  <div class="section">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Accuracy</th>
+          <th>Macro F1</th>
+          <th>F1-Pos</th>
+          <th>F1-Neu</th>
+          <th>F1-Neg</th>
+          <th>Prec-Neg</th>
+          <th>Recall-Neg</th>
+          <th>n_valid</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>LLaMA 3.1 70B</td>
+          <td class="worst-val">48.19%</td>
+          <td class="worst-val">0.466</td>
+          <td class="worst-val">0.474</td>
+          <td>0.338</td>
+          <td>0.586</td>
+          <td>0.577</td>
+          <td>0.596</td>
+          <td>965</td>
+        </tr>
+        <tr>
+          <td>DeepSeek-R1</td>
+          <td class="worst-val">54.08%</td>
+          <td class="worst-val">0.503</td>
+          <td>0.592</td>
+          <td class="worst-val">0.307</td>
+          <td>0.609</td>
+          <td>0.569</td>
+          <td>0.656</td>
+          <td>969</td>
+        </tr>
+        <tr>
+          <td>Mistral 3.1</td>
+          <td class="mid-val">61.69%</td>
+          <td class="mid-val">0.580</td>
+          <td>0.567</td>
+          <td class="mid-val">0.443</td>
+          <td class="best-val">0.730</td>
+          <td class="best-val">0.731</td>
+          <td>0.728</td>
+          <td>997</td>
+        </tr>
+        <tr>
+          <td>Phi-3-Medium</td>
+          <td class="mid-val">61.52%</td>
+          <td class="mid-val">0.585</td>
+          <td>0.590</td>
+          <td class="mid-val">0.454</td>
+          <td>0.710</td>
+          <td>0.718</td>
+          <td>0.703</td>
+          <td>998</td>
+        </tr>
+        <tr>
+          <td>Gemma 3</td>
+          <td class="mid-val">63.13%</td>
+          <td class="mid-val">0.569</td>
+          <td class="best-val">0.663</td>
+          <td>0.343</td>
+          <td>0.703</td>
+          <td>0.657</td>
+          <td class="best-val">0.757</td>
+          <td>998</td>
+        </tr>
+        <tr>
+          <td>Phi-4</td>
+          <td class="best-val">65.43%</td>
+          <td class="best-val">0.617</td>
+          <td class="best-val">0.666</td>
+          <td class="best-val">0.439</td>
+          <td class="best-val">0.747</td>
+          <td>0.743</td>
+          <td>0.750</td>
+          <td>998</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BIAS DIRECTION -->
+  <div class="section-label">03 — Negative Bias Direction (% of errors that skew negative)</div>
+  <div class="section">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">When a model gets a tweet wrong, how often did it call it <em>negative</em> when the human said positive or neutral? This is the direct measurement of dialectic bias.</p>
+
+    <div class="bias-row">
+      <div class="bias-label">Gemma 3 — 78.5% of errors skew negative (289/368 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:78.5%">78.5% → negative</div>
+        <div class="bias-pos" style="width:11.1%">11%</div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+    <div class="bias-row">
+      <div class="bias-label">Mistral 3.1 — 64.1% of errors skew negative (245/382 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:64.1%">64.1% → negative</div>
+        <div class="bias-pos" style="width:4.2%"></div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+    <div class="bias-row">
+      <div class="bias-label">Phi-3-Medium — 61.2% of errors skew negative (235/384 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:61.2%">61.2% → negative</div>
+        <div class="bias-pos" style="width:8.6%">8.6%</div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+    <div class="bias-row">
+      <div class="bias-label">Phi-4 — 60.3% of errors skew negative (208/345 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:60.3%">60.3% → negative</div>
+        <div class="bias-pos" style="width:9.9%">9.9%</div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+    <div class="bias-row">
+      <div class="bias-label">LLaMA 3.1 70B — 40.8% of errors skew negative (204/500 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:40.8%">40.8% → negative</div>
+        <div class="bias-pos" style="width:16.4%">16.4%</div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+    <div class="bias-row">
+      <div class="bias-label">DeepSeek-R1 — 44.0% of errors skew negative (196/445 errors)</div>
+      <div class="bias-track">
+        <div class="bias-neg" style="width:44.0%">44.0% → negative</div>
+        <div class="bias-pos" style="width:29.7%">29.7% → positive</div>
+        <div class="bias-rest"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY FINDINGS -->
+  <div class="section-label">04 — Key Findings to Highlight</div>
+  <div class="section">
+    <div class="finding">
+      <div class="f-label">Finding 1 — Neutral is the universal blind spot</div>
+      <p>Every single model scores dramatically lower on <strong>neutral F1</strong> than positive or negative. Range: 0.307 (DeepSeek) to 0.454 (Phi-3-Medium). Neutral AAE expression — matter-of-fact statements, dry humor, understated tone — is systematically misread. This is the register-flattening failure mode you identified in your qualitative analysis.</p>
+    </div>
+    <div class="finding">
+      <div class="f-label">Finding 2 — Gemma has the worst bias despite 2nd-best accuracy</div>
+      <p>Gemma 3 is accurate 63% of the time but <strong>78.5% of its errors are negative skew</strong> — the highest of any model. It's learning to be right by defaulting to negative. When it's wrong, it's almost always wrong in the same direction. High accuracy can mask severe directional bias.</p>
+    </div>
+    <div class="finding">
+      <div class="f-label">Finding 3 — DeepSeek is the only model without a dominant error direction</div>
+      <p>DeepSeek shows <strong>44% negative skew vs. 29.7% positive skew</strong> — the most balanced error distribution of the group, but also the worst macro F1 (0.503). It's uncertain rather than biased. A different failure mode worth calling out separately.</p>
+    </div>
+    <div class="finding">
+      <div class="f-label">Finding 4 — The "positive → negative" misclassification is universal</div>
+      <p>Across all 6 models, the single most common error type is <strong>human said positive, model said negative</strong>. LLaMA: 125 instances. Gemma: 151. Mistral: 131. This directly replicates and extends the DGI finding from the original paper using human ground truth instead of SAE-translated labels.</p>
+    </div>
+  </div>
+
+
+</div>
+</body>
+</html>
